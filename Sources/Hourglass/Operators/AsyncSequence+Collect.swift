@@ -5,6 +5,24 @@ private enum _CollectEvent<E: Sendable>: Sendable {
     case timerDone
 }
 
+// Boxes any AsyncSequence into an AsyncStream so its iterator can be shared across
+// task group children via _IteratorBox.
+private func _boxed<S: AsyncSequence & Sendable>(_ source: S) -> AsyncStream<S.Element>
+where S.Element: Sendable {
+    AsyncStream { cont in
+        let t = Task {
+            do {
+                for try await element in source {
+                    guard !Task.isCancelled else { break }
+                    cont.yield(element)
+                }
+            } catch {}
+            cont.finish()
+        }
+        cont.onTermination = { _ in t.cancel() }
+    }
+}
+
 public extension AsyncSequence where Self: Sendable, Element: Sendable {
     /// Groups elements into arrays, flushing at the end of each time window.
     /// Empty windows are skipped. A partial window at upstream completion is always flushed.
@@ -27,23 +45,8 @@ public extension AsyncSequence where Self: Sendable, Element: Sendable {
             }
 
             let mainTask = Task {
-                // Convert self to AsyncStream so we can box the iterator for the task group.
-                let upstreamStream = AsyncStream<Element> { cont in
-                    let t = Task {
-                        do {
-                            for try await element in upstream {
-                                guard !Task.isCancelled else { break }
-                                cont.yield(element)
-                            }
-                        } catch {}
-                        cont.finish()
-                    }
-                    cont.onTermination = { _ in t.cancel() }
-                }
-
-                let upBox = _IteratorBox(upstreamStream)
-                let tickBox = _IteratorBox(ticks)
-
+                let upBox = IteratorBox(_boxed(upstream))
+                let tickBox = IteratorBox(ticks)
                 var bucket: [Element] = []
 
                 await withTaskGroup(of: _CollectEvent<Element>.self) { group in

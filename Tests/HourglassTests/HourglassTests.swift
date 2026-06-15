@@ -174,6 +174,32 @@ private func settle() async {
         }
         #expect(result == [1, 2, 3])
     }
+
+    @Test func delayPreservesOrderWithoutAccumulating() async {
+        // Two elements arrive at the same virtual instant, so both are stamped with the same
+        // absolute deadline (t0 + 1s). A single advance fires both — a sequential delay that
+        // slept *after* dequeuing would need two advances. Proves the shift never accumulates.
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+
+        let task = Task {
+            for await v in stream.delay(for: .seconds(1), clock: clock) {
+                values.append(v)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2)
+        await settle()
+        await clock.waitForSleepers()
+        await clock.advance(by: .seconds(1))
+        await settle()
+        #expect(values.values == [1, 2])
+
+        cont.finish()
+        task.cancel()
+    }
 }
 
 // MARK: - AsyncSequence+Debounce
@@ -254,6 +280,52 @@ private func settle() async {
         #expect(values.values == [1])
 
         cont.finish()
+        task.cancel()
+    }
+
+    @Test func throttleTrailingEdgeEmitsLastWhenWindowCloses() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+
+        let task = Task {
+            for await v in stream.throttle(for: .seconds(1), clock: clock, latest: true) {
+                values.append(v)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2); cont.yield(3)
+        await settle()
+        #expect(values.values.isEmpty)  // trailing: nothing until the window closes
+
+        await clock.waitForSleepers()         // the window timer has registered its sleep
+        await clock.advance(by: .seconds(1))  // close the window → emit the latest (3)
+        await settle()
+        #expect(values.values == [3])
+
+        cont.finish()
+        task.cancel()
+    }
+
+    @Test func throttleTrailingFlushesPendingOnCompletion() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+
+        let task = Task {
+            for await v in stream.throttle(for: .seconds(1), clock: clock, latest: true) {
+                values.append(v)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2)
+        await settle()
+        cont.finish()  // completes before the window closes → flush the pending latest (2)
+        await settle()
+        #expect(values.values == [2])
+
         task.cancel()
     }
 }

@@ -17,7 +17,8 @@ public final class TestClock: Clock, @unchecked Sendable {
 
     private struct _State {
         var now: Instant = .init()
-        var sleepers: [(id: UUID, deadline: Instant, continuation: CheckedContinuation<Void, Error>)] = []
+        var nextID: Int = 0
+        var sleepers: [(id: Int, deadline: Instant, continuation: CheckedContinuation<Void, Error>)] = []
     }
 
     private let _lock = NSLock()
@@ -30,7 +31,7 @@ public final class TestClock: Clock, @unchecked Sendable {
 
     public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         try Task.checkCancellation()
-        let id = UUID()
+        let id: Int = _lock.withLock { _state.nextID; _state.nextID += 1; return _state.nextID - 1 }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
                 _lock.withLock {

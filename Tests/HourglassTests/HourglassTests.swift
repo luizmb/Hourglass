@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import Hourglass
+import Testing
 
 // MARK: - Test helpers
 
@@ -11,7 +11,7 @@ final class Collector<T: Sendable>: @unchecked Sendable {
     func append(_ value: T) { lock.withLock { _values.append(value) } }
 }
 
-final class _AtomicCounter: @unchecked Sendable {
+final class AtomicCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var _value = 0
     var current: Int { lock.withLock { _value } }
@@ -65,7 +65,7 @@ private func settle() async {
 
     @Test func sleepSuspendsUntilAdvanced() async {
         let clock = TestClock()
-        let awoke = _AtomicCounter()
+        let awoke = AtomicCounter()
 
         let task = Task {
             try? await clock.sleep(until: clock.now.advanced(by: .seconds(1)), tolerance: nil)

@@ -1,6 +1,6 @@
 # Hourglass
 
-Cross-platform Swift clock utilities and time-based `AsyncSequence` operators.
+Cross-platform Swift clock utilities and time-based `AsyncStream` operators.
 
 Zero dependencies beyond the Swift standard library and Foundation. Supports macOS, iOS, tvOS, watchOS, visionOS, Linux, Windows, and Android.
 
@@ -18,9 +18,9 @@ Zero dependencies beyond the Swift standard library and Foundation. Supports mac
 
 **`timerSequence(every:clock:)`** — Returns an `AsyncStream<C.Instant>` that emits the current clock instant at a fixed cadence. The stream runs until cancelled.
 
-### `AsyncSequence` operators
+### `AsyncStream` operators
 
-All operators extend `AsyncSequence where Self: Sendable, Element: Sendable` and return `AsyncStream<_>`. They are clock-injected — pass any `Clock` conformer (including `TestClock`) to make behaviour fully deterministic in tests.
+All operators extend `AsyncStream where Element: Sendable` and return `AsyncStream<_>` — pure, non-throwing passthrough timing. (Errors, if you model them, ride along as values in `Element`, e.g. `AsyncStream<Result<T, E>>`, and you compose terminal/error handling separately.) They are clock-injected — pass any `Clock` conformer (including `TestClock`) to make behaviour fully deterministic in tests.
 
 | Operator | Description |
 |---|---|

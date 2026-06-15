@@ -26,6 +26,17 @@ private func settle() async {
     for _ in 0..<12 { await Task.yield() }
 }
 
+// Polls a condition instead of relying on a fixed yield count — value delivery crosses two
+// async hops (the operator's loop and the test's consumer), which can be scheduled late under
+// parallel test load. Used for positive "value arrived" assertions.
+private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool) async {
+    for _ in 0..<(timeoutMs / 2) {
+        if condition() { return }
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 2_000_000)
+    }
+}
+
 // MARK: - ImmediateClock
 
 @Suite struct ImmediateClockTests {
@@ -391,6 +402,103 @@ private func settle() async {
         #expect(windows.values == [[1]])
 
         cont.finish()
+        task.cancel()
+    }
+}
+
+// MARK: - AsyncStream+Timeout
+
+private struct Timedout: Error, Equatable {}
+
+@Suite struct TimeoutTests {
+    @Test func timeoutFailsWhenUpstreamGoesQuiet() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+        let timeouts = AtomicCounter()
+
+        let task = Task {
+            for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
+                switch result {
+                case .success(let v): values.append(v)
+                case .failure: timeouts.increment()
+                }
+            }
+        }
+
+        await clock.waitForSleepers()          // initial deadline armed at subscription
+        await clock.advance(by: .seconds(1))   // no value arrived → fire
+        await poll { timeouts.current >= 1 }
+        #expect(values.values.isEmpty)
+        #expect(timeouts.current == 1)
+
+        cont.finish()
+        task.cancel()
+    }
+
+    @Test func timeoutForwardsValuesAndReArmsDeadline() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+        let timeouts = AtomicCounter()
+
+        let task = Task {
+            for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
+                switch result {
+                case .success(let v): values.append(v)
+                case .failure: timeouts.increment()
+                }
+            }
+        }
+
+        await settle()
+        cont.yield(1)
+        await poll { values.values.count >= 1 }
+        #expect(values.values == [1])
+
+        // Re-armed at t0+1s; advancing only partway must not fire.
+        await clock.waitForSleepers()
+        await clock.advance(by: .milliseconds(500))
+        await settle()
+        #expect(timeouts.current == 0)
+
+        cont.yield(2)
+        await poll { values.values.count >= 2 }
+        #expect(values.values == [1, 2])
+
+        // Now stay quiet past the (re-armed) window → fire.
+        await clock.waitForSleepers()
+        await clock.advance(by: .seconds(1))
+        await poll { timeouts.current >= 1 }
+        #expect(timeouts.current == 1)
+
+        cont.finish()
+        task.cancel()
+    }
+
+    @Test func timeoutCompletesNormallyWithoutFailure() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let values = Collector<Int>()
+        let timeouts = AtomicCounter()
+
+        let task = Task {
+            for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
+                switch result {
+                case .success(let v): values.append(v)
+                case .failure: timeouts.increment()
+                }
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2)
+        await poll { values.values.count >= 2 }
+        cont.finish()  // completes before the deadline → no failure
+        await settle()
+        #expect(values.values == [1, 2])
+        #expect(timeouts.current == 0)
+
         task.cancel()
     }
 }

@@ -31,7 +31,7 @@ public final class TestClock: Clock, @unchecked Sendable {
 
     public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         try Task.checkCancellation()
-        let id: Int = _lock.withLock { _state.nextID; _state.nextID += 1; return _state.nextID - 1 }
+        let id: Int = _lock.withLock { let i = _state.nextID; _state.nextID += 1; return i }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
                 _lock.withLock {

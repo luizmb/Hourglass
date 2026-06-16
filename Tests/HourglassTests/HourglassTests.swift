@@ -37,6 +37,18 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
     }
 }
 
+// Consumption barrier: waits for already-sent values to be drained into the operator's state
+// before the clock is advanced. Used only while the clock has NOT advanced — no timer tick can
+// fire yet — so it can't race a flush; it purely ensures the operator has consumed the values
+// (e.g. so collect buckets them, or debounce/throttle's pending reflects the latest) before the
+// advance triggers a window/flush. Generous and fixed because consumption has no pollable signal.
+private func drainSentValues() async {
+    for _ in 0..<60 {
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 1_000_000)
+    }
+}
+
 // MARK: - ImmediateClock
 
 @Suite struct ImmediateClockTests {
@@ -87,7 +99,7 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
         #expect(awoke.current == 0)
 
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { awoke.current >= 1 }
         #expect(awoke.current == 1)
         task.cancel()
     }
@@ -107,7 +119,7 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await clock.waitForSleepers(count: 2)
         await clock.advance(by: .seconds(2))
-        await settle()
+        await poll { order.values.count >= 2 }
 
         #expect(order.values == [1, 2])
         t1.cancel(); t2.cancel()
@@ -142,10 +154,9 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
         await clock.advance(by: .seconds(1))
         await clock.waitForSleepers()
         await clock.advance(by: .seconds(1))
-        await settle()
-        task.cancel()
-
+        await poll { instants.values.count >= 3 }
         #expect(instants.values.count == 3)
+        task.cancel()
     }
 }
 
@@ -171,7 +182,7 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
         #expect(values.values.isEmpty)
 
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [1])
 
         cont.finish()
@@ -202,10 +213,10 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2)
-        await settle()
+        await drainSentValues()
         await clock.waitForSleepers()
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { values.values.count >= 2 }
         #expect(values.values == [1, 2])
 
         cont.finish()
@@ -229,12 +240,12 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2); cont.yield(3)
-        await settle()  // outer task processes all 3 values and creates final pendingTask
+        await drainSentValues()  // all 3 consumed → final pendingTask is for value 3
         await clock.waitForSleepers()
         #expect(values.values.isEmpty)
 
         await clock.advance(by: .milliseconds(300))
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [3])
 
         cont.finish()
@@ -260,10 +271,10 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
         #expect(values.values.isEmpty)
 
         cont.yield(2)
-        await settle()  // outer task cancels pendingTask1 (removes from sleepers) and creates pendingTask2
+        await drainSentValues()  // pendingTask1 cancelled, pendingTask2 (value 2) registered
         await clock.waitForSleepers()  // wait for pendingTask2 to register its sleep
         await clock.advance(by: .milliseconds(300))
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [2])
 
         cont.finish()
@@ -287,7 +298,7 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2); cont.yield(3)
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [1])
 
         cont.finish()
@@ -307,12 +318,12 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2); cont.yield(3)
-        await settle()
-        #expect(values.values.isEmpty)  // trailing: nothing until the window closes
+        await drainSentValues()          // all consumed → pending latest is 3, window timer armed
+        #expect(values.values.isEmpty)   // trailing: nothing until the window closes
 
         await clock.waitForSleepers()         // the window timer has registered its sleep
         await clock.advance(by: .seconds(1))  // close the window → emit the latest (3)
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [3])
 
         cont.finish()
@@ -332,9 +343,9 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2)
-        await settle()
+        await drainSentValues()  // both consumed → pending latest is 2
         cont.finish()  // completes before the window closes → flush the pending latest (2)
-        await settle()
+        await poll { values.values.count >= 1 }
         #expect(values.values == [2])
 
         task.cancel()
@@ -357,14 +368,14 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
 
         await settle()
         cont.yield(1); cont.yield(2)
-        await settle()  // let collect task group pick up both values into the bucket
+        await drainSentValues()  // both values bucketed before the tick
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { windows.values.count >= 1 }
 
         cont.yield(3)
-        await settle()  // let collect task group pick up value 3
+        await drainSentValues()  // value 3 bucketed before the next tick
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { windows.values.count >= 2 }
 
         #expect(windows.values == [[1, 2], [3]])
         cont.finish()
@@ -396,9 +407,9 @@ private func poll(timeoutMs: Int = 2_000, until condition: @Sendable () -> Bool)
         #expect(windows.values.isEmpty)
 
         cont.yield(1)
-        await settle()  // let collect task group pick up value 1 before next tick
+        await drainSentValues()  // value 1 bucketed before the next tick
         await clock.advance(by: .seconds(1))
-        await settle()
+        await poll { windows.values.count >= 1 }
         #expect(windows.values == [[1]])
 
         cont.finish()

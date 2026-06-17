@@ -513,3 +513,75 @@ private struct Timedout: Error, Equatable {}
         task.cancel()
     }
 }
+
+// MARK: - AnyClock
+
+@Suite struct AnyClockTests {
+    @Test func instantArithmeticIsOffsetBased() {
+        let a = AnyClock<Duration>.Instant(offset: .seconds(2))
+        let b = a.advanced(by: .seconds(3))
+        #expect(b.offset == .seconds(5))
+        #expect(a.duration(to: b) == .seconds(3))
+        #expect(a < b)
+    }
+
+    @Test func nowReflectsUnderlyingAdvance() async {
+        let testClock = TestClock()
+        let clock = testClock.eraseToAnyClock()
+        #expect(clock.now.offset == .zero)
+        await testClock.advance(by: .seconds(3))
+        #expect(clock.now.offset == .seconds(3))
+    }
+
+    @Test func originIsCapturedAtErasureNotZero() async {
+        let testClock = TestClock()
+        await testClock.advance(by: .seconds(10))   // wrapped clock already at 10s
+        let clock = testClock.eraseToAnyClock()      // origin captured here
+        #expect(clock.now.offset == .zero)           // measured relative to erasure
+        await testClock.advance(by: .seconds(4))
+        #expect(clock.now.offset == .seconds(4))
+    }
+
+    @Test func sleepWakesWhenUnderlyingAdvancesPastDeadline() async {
+        let testClock = TestClock()
+        let clock = testClock.eraseToAnyClock()
+        let woke = AtomicCounter()
+        let task = Task {
+            try? await clock.sleep(for: .seconds(2))
+            woke.increment()
+        }
+        await testClock.waitForSleepers()   // the erased sleep registered in the wrapped clock
+        #expect(woke.current == 0)
+        await testClock.advance(by: .seconds(2))
+        await poll { woke.current == 1 }
+        #expect(woke.current == 1)
+        task.cancel()
+    }
+
+    @Test func immediateClockSleepReturnsImmediately() async {
+        let clock = ImmediateClock().eraseToAnyClock()
+        try? await clock.sleep(for: .seconds(60))   // returns at once; offset stays zero
+        #expect(clock.now.offset == .zero)
+    }
+
+    // Proves AnyClock is a drop-in `C: Clock & Sendable` for the timing operators: drive a
+    // `delay` through an erased TestClock by advancing the wrapped clock.
+    @Test func erasedClockDrivesDelayOperator() async {
+        let testClock = TestClock()
+        let clock = testClock.eraseToAnyClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let out = Collector<Int>()
+        let task = Task {
+            for await v in stream.delay(for: .seconds(1), clock: clock) { out.append(v) }
+        }
+        await settle()
+        cont.yield(1)
+        await drainSentValues()
+        #expect(out.values.isEmpty)               // held until the deadline
+        await testClock.advance(by: .seconds(1))
+        await poll { out.values.count == 1 }
+        #expect(out.values == [1])
+        cont.finish()
+        task.cancel()
+    }
+}

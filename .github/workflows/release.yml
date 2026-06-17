@@ -74,11 +74,43 @@ jobs:
       - name: Test
         run: swift test --no-parallel 2>&1
 
+  rc-test-android:
+    name: RC - Test (Android)
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-latest
+    needs: rc-test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test Swift Package on Android
+        uses: skiptools/swift-android-action@v2
+        with:
+          free-disk-space: true
+
+  rc-test-windows:
+    name: RC - Test (Windows)
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: windows-latest
+    needs: rc-test
+    steps:
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
+
+      - uses: actions/checkout@v6
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
   rc-notify-status:
     name: RC - Notify Status
     if: startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
-    needs: [rc-test, rc-test-linux]
+    needs: [rc-test, rc-test-linux, rc-test-android, rc-test-windows]
     steps:
       - name: Extract Version
         id: version

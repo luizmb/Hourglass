@@ -585,3 +585,74 @@ private struct Timedout: Error, Equatable {}
         task.cancel()
     }
 }
+
+// MARK: - AsyncStream+CollectByTimeOrCount
+
+@Suite struct CollectByTimeOrCountTests {
+    @Test func flushesWhenCountReachedBeforeTime() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let windows = Collector<[Int]>()
+
+        let task = Task {
+            for await w in stream.collect(every: .seconds(10), orCount: 3, clock: clock) {
+                windows.append(w)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2); cont.yield(3)  // count reached — flush without advancing the clock
+        await poll { windows.values.count >= 1 }
+        #expect(windows.values == [[1, 2, 3]])
+
+        cont.finish()
+        task.cancel()
+    }
+
+    @Test func flushesByTimeWhenCountNotReached() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let windows = Collector<[Int]>()
+
+        let task = Task {
+            for await w in stream.collect(every: .seconds(1), orCount: 5, clock: clock) {
+                windows.append(w)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2)
+        await drainSentValues()
+        await clock.advance(by: .seconds(1))
+        await poll { windows.values.count >= 1 }
+        #expect(windows.values == [[1, 2]])
+
+        cont.finish()
+        task.cancel()
+    }
+
+    @Test func countFlushResetsTheTimeWindow() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let windows = Collector<[Int]>()
+
+        let task = Task {
+            for await w in stream.collect(every: .seconds(1), orCount: 3, clock: clock) {
+                windows.append(w)
+            }
+        }
+
+        await settle()
+        cont.yield(1); cont.yield(2); cont.yield(3)  // count flush -> [1,2,3], window resets
+        await poll { windows.values.count >= 1 }
+
+        cont.yield(4)                                  // partial window
+        await drainSentValues()
+        await clock.advance(by: .seconds(1))           // time flush -> [4]
+        await poll { windows.values.count >= 2 }
+        #expect(windows.values == [[1, 2, 3], [4]])
+
+        cont.finish()
+        task.cancel()
+    }
+}

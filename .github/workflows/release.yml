@@ -23,7 +23,7 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       HOMEBREW_NO_INSTALL_CLEANUP: "1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: rc-test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build
         run: swift build 2>&1
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: rc-test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Test Swift Package on Android
         uses: skiptools/swift-android-action@v2
@@ -98,7 +98,7 @@ jobs:
           swift-version: swift-6.2-release
           swift-build: 6.2-RELEASE
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build
         run: swift build
@@ -139,7 +139,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Validate Tag Format
         run: |
@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: promote-test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

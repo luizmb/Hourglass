@@ -118,10 +118,20 @@ private func drainSentValues() async {
         }
 
         await clock.waitForSleepers(count: 2)
-        await clock.advance(by: .seconds(2))
-        await poll { order.values.count >= 2 }
 
+        // Cross the deadlines one at a time. A single advance past both would resume t1 and t2
+        // in deadline order, but their *bodies* run as independent tasks that the executor can
+        // interleave freely — so observing append order from one advance is a race (it flaked
+        // as [2, 1]). Stepping per-deadline and draining each wake makes the ordering a property
+        // of the clock's deadlines, not of scheduler luck, and also proves t2 stays asleep at 1s.
+        await clock.advance(by: .seconds(1))
+        await poll { order.values.count >= 1 }
+        #expect(order.values == [1])
+
+        await clock.advance(by: .seconds(1))
+        await poll { order.values.count >= 2 }
         #expect(order.values == [1, 2])
+
         t1.cancel(); t2.cancel()
     }
 }

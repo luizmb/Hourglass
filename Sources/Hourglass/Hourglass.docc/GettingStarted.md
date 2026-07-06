@@ -7,7 +7,7 @@ Install Hourglass and write your first deterministic timing test.
 Add the package to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/luizmb/Hourglass.git", from: "0.6.2")
+.package(url: "https://github.com/luizmb/Hourglass.git", from: "0.7.0")
 ```
 
 Then add the product to your target:

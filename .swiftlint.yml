@@ -127,5 +127,4 @@ custom_rules:
     severity: error
 
 file_header:
-  required: true
-  forbiddenPattern: "^(?!// SPDX-License-Identifier)"
+  required_string: "// SPDX-License-Identifier: Apache-2.0"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /// Returns an `AsyncStream` that emits the current clock instant at every `interval`.
 /// The first tick fires after one full `interval` from the call site.
 /// The stream runs until cancelled.

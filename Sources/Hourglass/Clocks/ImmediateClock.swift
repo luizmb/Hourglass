@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /// A clock whose `sleep` returns immediately.
 /// Use in tests for operators that schedule work but where you don't care about real wall-clock delays.
 public struct ImmediateClock: Clock, Sendable {

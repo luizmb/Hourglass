@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 
 /// A clock whose time only advances when you call `advance(by:)`.

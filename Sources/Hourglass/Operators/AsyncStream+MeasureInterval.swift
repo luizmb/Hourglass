@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 public extension AsyncStream where Element: Sendable {
     /// Replaces each element with the elapsed duration since the previous element (or subscription).
     func measureInterval<C: Clock>(using clock: C) -> AsyncStream<C.Instant.Duration>

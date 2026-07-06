@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Boxes an AsyncStream iterator for use in task-group patterns where a single iterator
 // is advanced by successive task-group children — exactly one child calls next() at a time.
 // @unchecked Sendable: safe because the FIFO task-group pattern serialises all next() calls.

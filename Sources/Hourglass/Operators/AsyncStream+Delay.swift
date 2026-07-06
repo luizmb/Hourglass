@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 public extension AsyncStream where Element: Sendable {
     /// Shifts every element forward in time by `interval` before forwarding it downstream.
     ///

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import Foundation
 @testable import Hourglass
 import Testing
@@ -23,7 +25,9 @@ final class AtomicCounter: @unchecked Sendable {
 // collect has 3 layers of async indirection under concurrent test load, so 12 yields
 // is the safe margin for all operators in this suite.
 private func settle() async {
-    for _ in 0..<12 { await Task.yield() }
+    for _ in 0..<12 {
+        await Task.yield()
+    }
 }
 
 // Polls a condition instead of relying on a fixed yield count — value delivery crosses two
@@ -188,7 +192,7 @@ private func drainSentValues() async {
         await settle()
 
         cont.yield(1)
-        await clock.waitForSleepers()  // wait for delay's internal sleep to register
+        await clock.waitForSleepers() // wait for delay's internal sleep to register
         #expect(values.values.isEmpty)
 
         await clock.advance(by: .seconds(1))
@@ -250,7 +254,7 @@ private func drainSentValues() async {
 
         await settle()
         cont.yield(1); cont.yield(2); cont.yield(3)
-        await drainSentValues()  // all 3 consumed → final pendingTask is for value 3
+        await drainSentValues() // all 3 consumed → final pendingTask is for value 3
         await clock.waitForSleepers()
         #expect(values.values.isEmpty)
 
@@ -281,8 +285,8 @@ private func drainSentValues() async {
         #expect(values.values.isEmpty)
 
         cont.yield(2)
-        await drainSentValues()  // pendingTask1 cancelled, pendingTask2 (value 2) registered
-        await clock.waitForSleepers()  // wait for pendingTask2 to register its sleep
+        await drainSentValues() // pendingTask1 cancelled, pendingTask2 (value 2) registered
+        await clock.waitForSleepers() // wait for pendingTask2 to register its sleep
         await clock.advance(by: .milliseconds(300))
         await poll { values.values.count >= 1 }
         #expect(values.values == [2])
@@ -328,11 +332,11 @@ private func drainSentValues() async {
 
         await settle()
         cont.yield(1); cont.yield(2); cont.yield(3)
-        await drainSentValues()          // all consumed → pending latest is 3, window timer armed
-        #expect(values.values.isEmpty)   // trailing: nothing until the window closes
+        await drainSentValues() // all consumed → pending latest is 3, window timer armed
+        #expect(values.values.isEmpty) // trailing: nothing until the window closes
 
-        await clock.waitForSleepers()         // the window timer has registered its sleep
-        await clock.advance(by: .seconds(1))  // close the window → emit the latest (3)
+        await clock.waitForSleepers() // the window timer has registered its sleep
+        await clock.advance(by: .seconds(1)) // close the window → emit the latest (3)
         await poll { values.values.count >= 1 }
         #expect(values.values == [3])
 
@@ -353,8 +357,8 @@ private func drainSentValues() async {
 
         await settle()
         cont.yield(1); cont.yield(2)
-        await drainSentValues()  // both consumed → pending latest is 2
-        cont.finish()  // completes before the window closes → flush the pending latest (2)
+        await drainSentValues() // both consumed → pending latest is 2
+        cont.finish() // completes before the window closes → flush the pending latest (2)
         await poll { values.values.count >= 1 }
         #expect(values.values == [2])
 
@@ -378,12 +382,12 @@ private func drainSentValues() async {
 
         await settle()
         cont.yield(1); cont.yield(2)
-        await drainSentValues()  // both values bucketed before the tick
+        await drainSentValues() // both values bucketed before the tick
         await clock.advance(by: .seconds(1))
         await poll { windows.values.count >= 1 }
 
         cont.yield(3)
-        await drainSentValues()  // value 3 bucketed before the next tick
+        await drainSentValues() // value 3 bucketed before the next tick
         await clock.advance(by: .seconds(1))
         await poll { windows.values.count >= 2 }
 
@@ -417,7 +421,7 @@ private func drainSentValues() async {
         #expect(windows.values.isEmpty)
 
         cont.yield(1)
-        await drainSentValues()  // value 1 bucketed before the next tick
+        await drainSentValues() // value 1 bucketed before the next tick
         await clock.advance(by: .seconds(1))
         await poll { windows.values.count >= 1 }
         #expect(windows.values == [[1]])
@@ -441,14 +445,14 @@ private struct Timedout: Error, Equatable {}
         let task = Task {
             for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
                 switch result {
-                case .success(let v): values.append(v)
+                case let .success(v): values.append(v)
                 case .failure: timeouts.increment()
                 }
             }
         }
 
-        await clock.waitForSleepers()          // initial deadline armed at subscription
-        await clock.advance(by: .seconds(1))   // no value arrived → fire
+        await clock.waitForSleepers() // initial deadline armed at subscription
+        await clock.advance(by: .seconds(1)) // no value arrived → fire
         await poll { timeouts.current >= 1 }
         #expect(values.values.isEmpty)
         #expect(timeouts.current == 1)
@@ -466,7 +470,7 @@ private struct Timedout: Error, Equatable {}
         let task = Task {
             for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
                 switch result {
-                case .success(let v): values.append(v)
+                case let .success(v): values.append(v)
                 case .failure: timeouts.increment()
                 }
             }
@@ -506,7 +510,7 @@ private struct Timedout: Error, Equatable {}
         let task = Task {
             for await result in stream.timeout(.seconds(1), clock: clock, error: { Timedout() }) {
                 switch result {
-                case .success(let v): values.append(v)
+                case let .success(v): values.append(v)
                 case .failure: timeouts.increment()
                 }
             }
@@ -515,7 +519,7 @@ private struct Timedout: Error, Equatable {}
         await settle()
         cont.yield(1); cont.yield(2)
         await poll { values.values.count >= 2 }
-        cont.finish()  // completes before the deadline → no failure
+        cont.finish() // completes before the deadline → no failure
         await settle()
         #expect(values.values == [1, 2])
         #expect(timeouts.current == 0)
@@ -545,9 +549,9 @@ private struct Timedout: Error, Equatable {}
 
     @Test func originIsCapturedAtErasureNotZero() async {
         let testClock = TestClock()
-        await testClock.advance(by: .seconds(10))   // wrapped clock already at 10s
-        let clock = testClock.eraseToAnyClock()      // origin captured here
-        #expect(clock.now.offset == .zero)           // measured relative to erasure
+        await testClock.advance(by: .seconds(10)) // wrapped clock already at 10s
+        let clock = testClock.eraseToAnyClock() // origin captured here
+        #expect(clock.now.offset == .zero) // measured relative to erasure
         await testClock.advance(by: .seconds(4))
         #expect(clock.now.offset == .seconds(4))
     }
@@ -560,7 +564,7 @@ private struct Timedout: Error, Equatable {}
             try? await clock.sleep(for: .seconds(2))
             woke.increment()
         }
-        await testClock.waitForSleepers()   // the erased sleep registered in the wrapped clock
+        await testClock.waitForSleepers() // the erased sleep registered in the wrapped clock
         #expect(woke.current == 0)
         await testClock.advance(by: .seconds(2))
         await poll { woke.current == 1 }
@@ -570,7 +574,7 @@ private struct Timedout: Error, Equatable {}
 
     @Test func immediateClockSleepReturnsImmediately() async {
         let clock = ImmediateClock().eraseToAnyClock()
-        try? await clock.sleep(for: .seconds(60))   // returns at once; offset stays zero
+        try? await clock.sleep(for: .seconds(60)) // returns at once; offset stays zero
         #expect(clock.now.offset == .zero)
     }
 
@@ -582,12 +586,14 @@ private struct Timedout: Error, Equatable {}
         let (stream, cont) = AsyncStream<Int>.makeStream()
         let out = Collector<Int>()
         let task = Task {
-            for await v in stream.delay(for: .seconds(1), clock: clock) { out.append(v) }
+            for await v in stream.delay(for: .seconds(1), clock: clock) {
+                out.append(v)
+            }
         }
         await settle()
         cont.yield(1)
         await drainSentValues()
-        #expect(out.values.isEmpty)               // held until the deadline
+        #expect(out.values.isEmpty) // held until the deadline
         await testClock.advance(by: .seconds(1))
         await poll { out.values.count == 1 }
         #expect(out.values == [1])
@@ -611,7 +617,7 @@ private struct Timedout: Error, Equatable {}
         }
 
         await settle()
-        cont.yield(1); cont.yield(2); cont.yield(3)  // count reached — flush without advancing the clock
+        cont.yield(1); cont.yield(2); cont.yield(3) // count reached — flush without advancing the clock
         await poll { windows.values.count >= 1 }
         #expect(windows.values == [[1, 2, 3]])
 
@@ -653,12 +659,12 @@ private struct Timedout: Error, Equatable {}
         }
 
         await settle()
-        cont.yield(1); cont.yield(2); cont.yield(3)  // count flush -> [1,2,3], window resets
+        cont.yield(1); cont.yield(2); cont.yield(3) // count flush -> [1,2,3], window resets
         await poll { windows.values.count >= 1 }
 
-        cont.yield(4)                                  // partial window
+        cont.yield(4) // partial window
         await drainSentValues()
-        await clock.advance(by: .seconds(1))           // time flush -> [4]
+        await clock.advance(by: .seconds(1)) // time flush -> [4]
         await poll { windows.values.count >= 2 }
         #expect(windows.values == [[1, 2, 3], [4]])
 

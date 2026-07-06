@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Boxes a sequence iterator for use in AsyncStream(unfolding:), which captures a @Sendable closure.
 // @unchecked Sendable: safe because AsyncStream guarantees single-consumer iteration.
 private final class _SequenceBox<S: Sequence & Sendable>: @unchecked Sendable {

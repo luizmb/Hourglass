@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 public extension AsyncStream where Element: Sendable {
     /// Rate-limits the upstream to at most one element per `interval` window.
     ///
@@ -40,10 +42,10 @@ private func runThrottle<Element: Sendable, C: Clock & Sendable>(
     var pending: Element?
 
     await withTaskGroup(of: ThrottleEvent<Element>.self) { group in
-        group.addTask { .upstream(await upBox.next()) }
+        group.addTask { await .upstream(upBox.next()) }
         loop: while let event = await group.next() {
             switch event {
-            case .upstream(let maybe):
+            case let .upstream(maybe):
                 guard let value = maybe else {
                     if latest, let value = pending { _ = continuation.yield(value) }
                     break loop
@@ -58,7 +60,7 @@ private func runThrottle<Element: Sendable, C: Clock & Sendable>(
                         return .tick
                     }
                 }
-                group.addTask { .upstream(await upBox.next()) }
+                group.addTask { await .upstream(upBox.next()) }
             case .tick:
                 windowOpen = false
                 if latest, let value = pending {

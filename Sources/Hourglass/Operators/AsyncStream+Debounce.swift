@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 public extension AsyncStream where Element: Sendable {
     /// Delays forwarding elements until the upstream is idle for `interval`.
     /// If new elements arrive within the window, the timer resets. Only the last

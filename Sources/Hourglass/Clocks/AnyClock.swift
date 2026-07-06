@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /// A type-erased `Clock` that hides the concrete clock and its `Instant` type, keeping only the
 /// `Duration` visible.
 ///

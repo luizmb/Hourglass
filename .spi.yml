@@ -1,0 +1,13 @@
+version: 1
+builder:
+  configs:
+    - platform: macosSpm
+      documentation_targets:
+        - Hourglass
+    - platform: ios
+    - platform: tvos
+    - platform: watchos
+    - platform: visionos
+    - platform: linux
+    - platform: windows
+    - platform: android

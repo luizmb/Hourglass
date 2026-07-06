@@ -6,6 +6,7 @@ excluded:
   - .build
 
 opt_in_rules:
+  - file_header
   - array_init
   - closure_end_indentation
   - closure_spacing
@@ -124,3 +125,7 @@ custom_rules:
     regex: '[ a-zA-Z0-9]*(?:let|var) [ a-zA-Z0-9]*: ([a-zA-Z0-9]*)[ ]*= \1'
     message: "Type Definition Not Needed"
     severity: error
+
+file_header:
+  required: true
+  forbiddenPattern: "^(?!// SPDX-License-Identifier)"

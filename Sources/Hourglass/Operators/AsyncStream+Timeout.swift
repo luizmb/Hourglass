@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 public extension AsyncStream where Element: Sendable {
     /// Forwards each element as `.success`, but fails if the upstream goes quiet for too long.
     ///

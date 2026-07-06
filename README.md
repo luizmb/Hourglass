@@ -1,5 +1,12 @@
 # Hourglass
 
+[![CI](https://github.com/luizmb/Hourglass/actions/workflows/ci.yml/badge.svg)](https://github.com/luizmb/Hourglass/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://ios.lu/Hourglass)
+[![Swift 6.3+](https://img.shields.io/badge/swift-6.3%2B-orange)](https://swift.org)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
+**[→ Full API Documentation](https://ios.lu/Hourglass)** · [Installation](#installation)
+
 Cross-platform Swift clock utilities and time-based `AsyncStream` operators.
 
 Zero dependencies beyond the Swift standard library and Foundation. Supports macOS, iOS, tvOS, watchOS, visionOS, Linux, Windows, and Android.
@@ -36,7 +43,7 @@ All operators extend `AsyncStream where Element: Sendable` and return `AsyncStre
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/luizmb/Hourglass", from: "0.1.0")
+.package(url: "https://github.com/luizmb/Hourglass.git", from: "0.6.2")
 
 // target dependency
 .product(name: "Hourglass", package: "Hourglass")
@@ -145,4 +152,4 @@ Minimum Apple targets are set by the `Clock` protocol (Swift 5.7 / Xcode 14).
 
 ## License
 
-MIT
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.

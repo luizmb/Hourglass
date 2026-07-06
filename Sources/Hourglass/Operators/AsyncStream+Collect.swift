@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 private enum CollectEvent<Element: Sendable>: Sendable {
     case value(Element)
     case upstreamDone
@@ -57,11 +59,11 @@ private func runCollect<Element: Sendable>(
 
     await withTaskGroup(of: CollectEvent<Element>.self) { group in
         group.addTask { if let value = await upBox.next() { .value(value) } else { .upstreamDone } }
-        group.addTask { (await tickBox.next()) != nil ? .tick : .timerDone }
+        group.addTask { await (tickBox.next()) != nil ? .tick : .timerDone }
 
         outer: while let event = await group.next() {
             switch event {
-            case .value(let value):
+            case let .value(value):
                 bucket.append(value)
                 group.addTask { if let value = await upBox.next() { .value(value) } else { .upstreamDone } }
             case .tick:
@@ -69,7 +71,7 @@ private func runCollect<Element: Sendable>(
                     if case .terminated = continuation.yield(bucket) { break outer }
                     bucket = []
                 }
-                group.addTask { (await tickBox.next()) != nil ? .tick : .timerDone }
+                group.addTask { await (tickBox.next()) != nil ? .tick : .timerDone }
             case .upstreamDone:
                 timerTask.cancel(); ticksContinuation.finish()
                 break outer

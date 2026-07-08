@@ -55,7 +55,7 @@ private func drainSentValues() async {
 
 // MARK: - ImmediateClock
 
-@Suite struct ImmediateClockTests {
+@Suite(.timeLimit(.minutes(1))) struct ImmediateClockTests {
     @Test func sleepReturnsImmediately() async {
         let clock = ImmediateClock()
         let start = clock.now
@@ -102,7 +102,7 @@ private func drainSentValues() async {
 
 // MARK: - TestClock
 
-@Suite struct TestClockTests {
+@Suite(.timeLimit(.minutes(1))) struct TestClockTests {
     @Test func initialNowIsZero() {
         let clock = TestClock()
         #expect(clock.now.offset == .zero)
@@ -218,7 +218,7 @@ private func drainSentValues() async {
 
 // MARK: - timerSequence
 
-@Suite struct TimerSequenceTests {
+@Suite(.timeLimit(.minutes(1))) struct TimerSequenceTests {
     @Test func emitsWithImmediateClock() async {
         var count = 0
         for await _ in timerSequence(every: .seconds(1), clock: ImmediateClock()) {
@@ -252,7 +252,7 @@ private func drainSentValues() async {
 
 // MARK: - AsyncSequence+Delay
 
-@Suite struct DelayTests {
+@Suite(.timeLimit(.minutes(1))) struct DelayTests {
     @Test func delayHoldsValuesUntilClockAdvances() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -316,7 +316,7 @@ private func drainSentValues() async {
 
 // MARK: - AsyncSequence+Debounce
 
-@Suite struct DebounceTests {
+@Suite(.timeLimit(.minutes(1))) struct DebounceTests {
     @Test func debounceEmitsLastValueAfterQuietPeriod() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -374,7 +374,7 @@ private func drainSentValues() async {
 
 // MARK: - AsyncSequence+Throttle
 
-@Suite struct ThrottleTests {
+@Suite(.timeLimit(.minutes(1))) struct ThrottleTests {
     @Test func throttleLeadingEdgeEmitsFirstInWindow() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -444,7 +444,7 @@ private func drainSentValues() async {
 
 // MARK: - AsyncSequence+Collect
 
-@Suite struct CollectByTimeTests {
+@Suite(.timeLimit(.minutes(1))) struct CollectByTimeTests {
     @Test func collectGroupsValuesIntoWindows() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -511,7 +511,7 @@ private func drainSentValues() async {
 
 private struct Timedout: Error, Equatable {}
 
-@Suite struct TimeoutTests {
+@Suite(.timeLimit(.minutes(1))) struct TimeoutTests {
     @Test func timeoutFailsWhenUpstreamGoesQuiet() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -606,7 +606,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - AnyClock
 
-@Suite struct AnyClockTests {
+@Suite(.timeLimit(.minutes(1))) struct AnyClockTests {
     @Test func instantArithmeticIsOffsetBased() {
         let a = AnyClock<Duration>.Instant(offset: .seconds(2))
         let b = a.advanced(by: .seconds(3))
@@ -680,7 +680,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - AsyncStream+MeasureInterval
 
-@Suite struct MeasureIntervalTests {
+@Suite(.timeLimit(.minutes(1))) struct MeasureIntervalTests {
     @Test func reportsElapsedBetweenElements() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()
@@ -706,7 +706,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - WallClock
 
-@Suite struct WallClockTests {
+@Suite(.timeLimit(.minutes(1))) struct WallClockTests {
     private let epoch = Date(timeIntervalSince1970: 0)
 
     @Test func nowReflectsInjectedProvider() {
@@ -747,7 +747,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - UnimplementedClock
 
-@Suite struct UnimplementedClockTests {
+@Suite(.timeLimit(.minutes(1))) struct UnimplementedClockTests {
     @Test func reportsWhenNowIsRead() {
         let messages = Collector<String>()
         let clock = UnimplementedClock("must not read time") { messages.append($0) }
@@ -782,7 +782,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - Clock.timer convenience
 
-@Suite struct ClockTimerConvenienceTests {
+@Suite(.timeLimit(.minutes(1))) struct ClockTimerConvenienceTests {
     @Test func timerMethodEmitsLikeTimerSequence() async {
         var count = 0
         for await _ in ImmediateClock().timer(every: .seconds(1)) {
@@ -795,7 +795,7 @@ private struct Timedout: Error, Equatable {}
 
 // MARK: - AsyncStream+CollectByTimeOrCount
 
-@Suite struct CollectByTimeOrCountTests {
+@Suite(.timeLimit(.minutes(1))) struct CollectByTimeOrCountTests {
     @Test func flushesWhenCountReachedBeforeTime() async {
         let clock = TestClock()
         let (stream, cont) = AsyncStream<Int>.makeStream()

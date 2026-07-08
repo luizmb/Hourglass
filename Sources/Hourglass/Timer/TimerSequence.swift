@@ -13,6 +13,10 @@ where C: Sendable {
                 guard !Task.isCancelled else { return }
                 if case .terminated = continuation.yield(clock.now) { return }
                 next = next.advanced(by: interval)
+                // Cooperative yield: with a clock whose `sleep` returns without suspending (e.g.
+                // ``ImmediateClock``) this loop would otherwise monopolise the executor and starve
+                // the consumer on a single-threaded runtime. This hands the thread back each tick.
+                await Task.yield()
             }
         }
         continuation.onTermination = { _ in task.cancel() }

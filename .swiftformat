@@ -1,3 +1,7 @@
+# Exclusions
+# DocC tutorial code samples are illustrative snippets, not compiled source — leave them verbatim.
+--exclude Sources/Hourglass/Hourglass.docc
+
 # Indentation
 --indent 4
 --tabwidth 4

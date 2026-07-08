@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-label="A burst of events collapsing into a single output.">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17233a"/>
+      <stop offset="1" stop-color="#0e1626"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#bg2)"/>
+  <!-- timeline -->
+  <line x1="120" y1="300" x2="1080" y2="300" stroke="#3a4a68" stroke-width="4"/>
+  <!-- burst of input events -->
+  <g fill="#7fa8ff">
+    <circle cx="300" cy="300" r="20"/>
+    <circle cx="360" cy="300" r="20"/>
+    <circle cx="420" cy="300" r="20"/>
+    <circle cx="480" cy="300" r="20"/>
+  </g>
+  <!-- quiet window bracket -->
+  <path d="M520 260 H860 V340" fill="none" stroke="#5a6f96" stroke-width="4" stroke-dasharray="10 10"/>
+  <!-- single debounced output -->
+  <circle cx="900" cy="300" r="32" fill="#f6c667"/>
+  <path d="M888 300 l8 8 l16 -18" fill="none" stroke="#1b2740" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

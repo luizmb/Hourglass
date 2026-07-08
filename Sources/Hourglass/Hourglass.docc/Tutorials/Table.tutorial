@@ -1,0 +1,18 @@
+@Tutorials(name: "Hourglass") {
+    @Intro(title: "Testing Time, Deterministically") {
+        Learn Hourglass by building real timing code and making it fully testable — no `sleep`, no
+        flakiness. You'll inject clocks, drive virtual time by hand, and ship the same code to
+        production.
+
+        @Image(source: tutorial-intro.svg, alt: "The Hourglass logo.")
+    }
+
+    @Chapter(name: "Debouncing with a Test Clock") {
+        Build a debounced search model, drive it with a ``TestClock``, and run it in production with
+        a real clock — all from one code path.
+
+        @Image(source: tutorial-section.svg, alt: "A stream of events collapsing into one.")
+
+        @TutorialReference(tutorial: "doc:DeterministicDebounce")
+    }
+}

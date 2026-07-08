@@ -13,8 +13,22 @@ where C: Sendable {
                 guard !Task.isCancelled else { return }
                 if case .terminated = continuation.yield(clock.now) { return }
                 next = next.advanced(by: interval)
+                // Cooperative yield: with a clock whose `sleep` returns without suspending (e.g.
+                // ``ImmediateClock``) this loop would otherwise monopolise the executor and starve
+                // the consumer on a single-threaded runtime. This hands the thread back each tick.
+                await Task.yield()
             }
         }
         continuation.onTermination = { _ in task.cancel() }
+    }
+}
+
+public extension Clock where Self: Sendable {
+    /// Returns an `AsyncStream` that emits this clock's current instant at every `interval`.
+    /// The first tick fires after one full `interval`; the stream runs until cancelled.
+    ///
+    /// A method-style spelling of ``timerSequence(every:clock:)`` — `clock.timer(every: .seconds(1))`.
+    func timer(every interval: Instant.Duration) -> AsyncStream<Instant> {
+        timerSequence(every: interval, clock: self)
     }
 }

@@ -7,7 +7,7 @@ Install Hourglass and write your first deterministic timing test.
 Add the package to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/luizmb/Hourglass.git", from: "0.7.0")
+.package(url: "https://github.com/luizmb/Hourglass.git", from: "1.0.0")
 ```
 
 Then add the product to your target:
@@ -16,10 +16,24 @@ Then add the product to your target:
 .product(name: "Hourglass", package: "Hourglass")
 ```
 
+## The idea: inject the clock
+
+Every timing API in Hourglass takes a `Clock`. In production you pass a real one
+(`ContinuousClock`); in tests you pass a virtual one. Your logic never changes — only the clock does.
+
+```swift
+func liveTicks() -> AsyncStream<ContinuousClock.Instant> {
+    timerSequence(every: .seconds(1), clock: ContinuousClock())
+}
+```
+
+Swapping in a ``TestClock`` at the call site makes that exact code deterministic. See
+<doc:ChoosingAClock> for which clock to reach for.
+
 ## Deterministic timing with `TestClock`
 
-``TestClock`` only advances when you call `advance(by:)`, so timing operators become fully
-deterministic — no `sleep`, no wall-clock flakiness.
+``TestClock`` only advances when you call `advance(by:)` (or `advance(to:)`, or `run()`), so timing
+operators become fully deterministic — no `sleep`, no wall-clock flakiness.
 
 ```swift
 import Hourglass
@@ -48,7 +62,8 @@ import Testing
 ## Fast tests with `ImmediateClock`
 
 ``ImmediateClock`` makes every `sleep` return immediately — perfect when you don't care about the
-delay, only the passthrough behaviour.
+delay, only the passthrough behaviour. Its `now` still advances to each sleep's deadline, so elapsed
+time stays meaningful.
 
 ```swift
 @Test func delayPassesThroughImmediately() async {
@@ -62,8 +77,8 @@ delay, only the passthrough behaviour.
 
 ## Timers
 
-``timerSequence(every:clock:)`` emits the current instant at a fixed cadence — real time in
-production, virtual time in tests.
+``timerSequence(every:clock:)`` (or the method form `clock.timer(every:)`) emits the current instant
+at a fixed cadence — real time in production, virtual time in tests.
 
 ```swift
 for await instant in timerSequence(every: .seconds(5), clock: ContinuousClock()) {
@@ -71,13 +86,8 @@ for await instant in timerSequence(every: .seconds(5), clock: ContinuousClock())
 }
 ```
 
-## Operators at a glance
+## Next steps
 
-Every operator extends `AsyncStream where Element: Sendable`, returns an `AsyncStream`, and takes a
-`Clock`:
-
-- `debounce(for:clock:)` — emit the last value after the stream is idle for the interval
-- `delay(for:clock:)` — shift every element forward
-- `throttle(for:clock:latest:)` — leading- or trailing-edge rate limiter
-- `measureInterval(using:)` — replace each element with the elapsed duration since the previous one
-- `collect(every:clock:)` — batch elements into arrays flushed at each window boundary
+- <doc:ChoosingAClock> — pick the right clock for the job
+- <doc:TestingTimingCode> — patterns for driving virtual time and asserting on it
+- <doc:Operators> — every operator, with examples and timing semantics

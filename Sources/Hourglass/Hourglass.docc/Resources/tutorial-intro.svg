@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-label="An hourglass with flowing sand.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2740"/>
+      <stop offset="1" stop-color="#0e1626"/>
+    </linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6c667"/>
+      <stop offset="1" stop-color="#e39a3b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" fill="url(#bg)"/>
+  <g transform="translate(600 300)">
+    <!-- frame -->
+    <rect x="-120" y="-190" width="240" height="26" rx="13" fill="#e7ecf5"/>
+    <rect x="-120" y="164" width="240" height="26" rx="13" fill="#e7ecf5"/>
+    <!-- glass -->
+    <path d="M-96 -164 H96 L14 0 L96 164 H-96 L-14 0 Z" fill="#ffffff" fill-opacity="0.06" stroke="#9fb0cc" stroke-width="6" stroke-linejoin="round"/>
+    <!-- top sand -->
+    <path d="M-70 -150 H70 L10 -22 H-10 Z" fill="url(#sand)"/>
+    <!-- bottom sand pile -->
+    <path d="M-78 150 H78 L40 78 H-40 Z" fill="url(#sand)"/>
+    <!-- falling stream -->
+    <rect x="-4" y="-14" width="8" height="150" rx="4" fill="url(#sand)"/>
+  </g>
+</svg>

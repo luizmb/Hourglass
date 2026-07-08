@@ -1,0 +1,129 @@
+@Tutorial(time: 15) {
+    @Intro(title: "Build a Deterministic Debounced Search") {
+        Timing code is notoriously hard to test — real `sleep`s make suites slow, and wall-clock
+        races make them flaky. In this tutorial you'll build a debounced search model, then make it
+        fully deterministic by injecting a ``TestClock``, and finally ship the *same* code to
+        production with a real clock.
+
+        @Image(source: tutorial-intro.svg, alt: "An hourglass beside a search field.")
+    }
+
+    @Section(title: "Model the search") {
+        @ContentAndMedia {
+            A search field emits a value on every keystroke. Running a query per keystroke is
+            wasteful — you want to wait until the user pauses. That's `debounce(for:clock:)`.
+
+            @Image(source: tutorial-section.svg, alt: "A stream of keystrokes collapsing into one query.")
+        }
+
+        @Steps {
+            @Step {
+                Start with a model that debounces keystrokes over a `ContinuousClock`.
+
+                @Code(name: "SearchModel.swift", file: debounce-search-01.swift)
+            }
+
+            @Step {
+                Hard-coding the clock blocks testing. Make the clock a stored property so the caller
+                chooses real or virtual time — the debounce logic is untouched.
+
+                @Code(name: "SearchModel.swift", file: debounce-search-02.swift)
+            }
+        }
+    }
+
+    @Section(title: "Drive it with virtual time") {
+        @ContentAndMedia {
+            Now write a test. A ``TestClock`` only advances when *you* say so, so you can push a
+            burst of keystrokes and control exactly when the debounce window closes.
+
+            @Image(source: tutorial-section.svg, alt: "A clock being advanced by hand.")
+        }
+
+        @Steps {
+            @Step {
+                Create a `TestClock`, build the model, and start consuming its debounced output.
+
+                @Code(name: "SearchModelTests.swift", file: debounce-search-03.swift)
+            }
+
+            @Step {
+                Yield a burst, wait for the debounce timer to register with
+                ``TestClock/waitForSleepers(count:)``, then advance past the window and assert that
+                only the last query survived.
+
+                @Code(name: "SearchModelTests.swift", file: debounce-search-04.swift)
+            }
+        }
+    }
+
+    @Section(title: "Ship it to production") {
+        @ContentAndMedia {
+            The payoff: the code you tested is the code you ship. Swap the `TestClock` for a real
+            one at the composition root — nothing else changes.
+
+            @Image(source: tutorial-section.svg, alt: "The same model running with a live clock.")
+        }
+
+        @Steps {
+            @Step {
+                Hand the model a `ContinuousClock` and feed it live keystrokes.
+
+                @Code(name: "App.swift", file: debounce-search-05.swift)
+            }
+        }
+    }
+
+    @Assessments {
+        @MultipleChoice {
+            What does `debounce(for: .milliseconds(300), clock:)` emit for the burst
+            `"c"`, `"ca"`, `"cat"` typed within 300ms, followed by 300ms of silence?
+
+            @Choice(isCorrect: true) {
+                Only `"cat"`.
+
+                @Justification(reaction: "Correct!") {
+                    Each keystroke resets the window; when the stream is finally idle for the full
+                    interval, debounce emits just the most recent value.
+                }
+            }
+
+            @Choice(isCorrect: false) {
+                All three: `"c"`, `"ca"`, `"cat"`.
+
+                @Justification(reaction: "Not quite.") {
+                    That would be pass-through. Debounce collapses a burst to the last value.
+                }
+            }
+
+            @Choice(isCorrect: false) {
+                Nothing — the window never closes.
+
+                @Justification(reaction: "Try again.") {
+                    With a `TestClock`, advancing by the interval closes the window and triggers the
+                    emission.
+                }
+            }
+        }
+
+        @MultipleChoice {
+            Why call ``TestClock/waitForSleepers(count:)`` before ``TestClock/advance(by:)``?
+
+            @Choice(isCorrect: true) {
+                To ensure the operator has registered its sleep before virtual time moves.
+
+                @Justification(reaction: "Correct!") {
+                    Operators register sleeps asynchronously; advancing too early misses the tick.
+                }
+            }
+
+            @Choice(isCorrect: false) {
+                To make the test wait in real wall-clock time.
+
+                @Justification(reaction: "Not quite.") {
+                    A `TestClock` never waits in real time — that's the point.
+                }
+            }
+        }
+    }
+}

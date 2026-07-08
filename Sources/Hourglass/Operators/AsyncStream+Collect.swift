@@ -23,6 +23,9 @@ public extension AsyncStream where Element: Sendable {
                     guard !Task.isCancelled else { return }
                     ticksContinuation.yield(())
                     next = next.advanced(by: interval)
+                    // Cooperative yield so a non-suspending clock (e.g. ``ImmediateClock``) can't
+                    // monopolise the executor and starve the consumer on a single-threaded runtime.
+                    await Task.yield()
                 }
                 ticksContinuation.finish()
             }

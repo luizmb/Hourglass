@@ -75,18 +75,57 @@ public final class TestClock: Clock, @unchecked Sendable {
     /// Yields between each woken task so they can run and register new sleeps before
     /// the next `advance` call.
     public func advance(by duration: Duration) async {
+        await advance(to: now.advanced(by: duration))
+    }
+
+    /// Advance virtual time to the absolute instant `deadline`, waking every task sleeping at or
+    /// before it. A no-op when `deadline` is at or before the current `now` (virtual time never
+    /// moves backwards). Yields between each woken task so they can run and register new sleeps
+    /// before the next call.
+    public func advance(to deadline: Instant) async {
         let toResume = _lock.withLock { () -> [CheckedContinuation<Void, Error>] in
-            // Capture 'now' as a local before any mutating call to avoid Swift exclusivity
-            // violations (removeAll closure would read _state.now while _state is mutably borrowed).
-            let now = _state.now.advanced(by: duration)
-            _state.now = now
-            let ready = _state.sleepers.filter { $0.deadline <= now }.map(\.continuation)
-            _state.sleepers.removeAll { $0.deadline <= now }
+            // Bail before mutating if the target is not in the future — keeps `now` monotonic.
+            guard deadline > _state.now else { return [] }
+            _state.now = deadline
+            let ready = _state.sleepers.filter { $0.deadline <= deadline }.map(\.continuation)
+            _state.sleepers.removeAll { $0.deadline <= deadline }
             return ready
         }
         for continuation in toResume {
             continuation.resume()
             await Task.yield()
         }
+    }
+
+    /// Advance virtual time as far as needed to wake every currently-suspended sleeper, draining
+    /// chained sleeps (a woken task that immediately sleeps again is also resumed). Returns once no
+    /// task is sleeping in this clock.
+    ///
+    /// Use this to exhaust a finite sequence of sleeps without counting `advance` steps. Do **not**
+    /// call it on a clock driving an unbounded producer (e.g. ``timerSequence(every:clock:)``),
+    /// which re-registers a sleeper forever and would never let `run()` return.
+    public func run() async {
+        while true {
+            if let deadline = _lock.withLock({ _state.sleepers.map(\.deadline).min() }) {
+                await advance(to: deadline)
+                continue
+            }
+            // No sleeper registered right now. A task just woken by the last `advance` may still be
+            // running toward its next sleep, so we can't conclude the clock is idle after a single
+            // hop. Yield generously; the moment a new sleeper appears, resume draining. Only when
+            // the full budget passes with none registered do we treat the clock as quiescent.
+            guard await hasSleeperWithinSettleBudget() else { return }
+        }
+    }
+
+    /// Yields up to a generous budget, returning `true` as soon as a sleeper registers (so draining
+    /// resumes immediately) and `false` if the budget elapses with none — a robust "is the clock
+    /// still doing work?" check that tolerates scheduler latency across platforms.
+    private func hasSleeperWithinSettleBudget() async -> Bool {
+        for _ in 0 ..< 1000 {
+            await Task.yield()
+            if !_lock.withLock({ _state.sleepers.isEmpty }) { return true }
+        }
+        return false
     }
 }

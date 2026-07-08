@@ -4,6 +4,8 @@ included:
 
 excluded:
   - .build
+  # DocC tutorial code samples — illustrative snippets, not compiled source.
+  - Sources/Hourglass/Hourglass.docc
 
 opt_in_rules:
   - file_header

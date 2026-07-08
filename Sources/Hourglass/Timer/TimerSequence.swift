@@ -18,3 +18,13 @@ where C: Sendable {
         continuation.onTermination = { _ in task.cancel() }
     }
 }
+
+public extension Clock where Self: Sendable {
+    /// Returns an `AsyncStream` that emits this clock's current instant at every `interval`.
+    /// The first tick fires after one full `interval`; the stream runs until cancelled.
+    ///
+    /// A method-style spelling of ``timerSequence(every:clock:)`` — `clock.timer(every: .seconds(1))`.
+    func timer(every interval: Instant.Duration) -> AsyncStream<Instant> {
+        timerSequence(every: interval, clock: self)
+    }
+}

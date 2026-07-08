@@ -62,9 +62,43 @@ private func drainSentValues() async {
         try? await clock.sleep(until: start.advanced(by: .seconds(60)), tolerance: nil)
     }
 
-    @Test func nowIsAlwaysZero() {
+    @Test func nowAdvancesToSleepDeadline() async {
         let clock = ImmediateClock()
         #expect(clock.now.offset == .zero)
+        try? await clock.sleep(until: clock.now.advanced(by: .seconds(5)), tolerance: nil)
+        #expect(clock.now.offset == .seconds(5))
+        try? await clock.sleep(until: clock.now.advanced(by: .seconds(3)), tolerance: nil)
+        #expect(clock.now.offset == .seconds(8))
+    }
+
+    @Test func nowStaysMonotonicOnPastDeadline() async {
+        let clock = ImmediateClock()
+        try? await clock.sleep(until: clock.now.advanced(by: .seconds(10)), tolerance: nil)
+        // Sleeping to an earlier instant must not move `now` backwards.
+        try? await clock.sleep(until: ImmediateClock.Instant(offset: .seconds(2)), tolerance: nil)
+        #expect(clock.now.offset == .seconds(10))
+    }
+
+    @Test func measureIntervalSeesElapsedTime() async {
+        // With an advancing `now`, measureInterval observes real elapsed time under an ImmediateClock.
+        // The per-element gaps telescope, so their sum equals the total advance from subscription to
+        // the last element regardless of how the consumer task interleaves — a race-free invariant.
+        let clock = ImmediateClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let durations = Collector<Duration>()
+        let task = Task {
+            for await d in stream.measureInterval(using: clock) {
+                durations.append(d)
+            }
+        }
+        await settle() // measureInterval captures its subscription instant (0) before the clock moves
+        cont.yield(1)
+        try? await clock.sleep(until: clock.now.advanced(by: .seconds(2)), tolerance: nil)
+        cont.yield(2)
+        cont.finish()
+        await task.value
+        #expect(durations.values.count == 2)
+        #expect(durations.values.reduce(Duration.zero, +) == .seconds(2))
     }
 
     @Test func delayWithImmediateClockPassesThrough() async {
@@ -88,6 +122,58 @@ private func drainSentValues() async {
         let clock = TestClock()
         await clock.advance(by: .seconds(5))
         #expect(clock.now.offset == .seconds(5))
+    }
+
+    @Test func advanceToMovesToAbsoluteInstant() async {
+        let clock = TestClock()
+        await clock.advance(to: .init(offset: .seconds(7)))
+        #expect(clock.now.offset == .seconds(7))
+    }
+
+    @Test func advanceToIsNoOpWhenNotInFuture() async {
+        let clock = TestClock()
+        await clock.advance(by: .seconds(5))
+        await clock.advance(to: .init(offset: .seconds(2))) // earlier than now
+        #expect(clock.now.offset == .seconds(5)) // unchanged, monotonic
+    }
+
+    @Test func advanceToWakesSleepersAtOrBeforeDeadline() async {
+        let clock = TestClock()
+        let awoke = AtomicCounter()
+        let task = Task {
+            try? await clock.sleep(until: clock.now.advanced(by: .seconds(3)), tolerance: nil)
+            awoke.increment()
+        }
+        await clock.waitForSleepers()
+        await clock.advance(to: .init(offset: .seconds(3)))
+        await poll { awoke.current >= 1 }
+        #expect(awoke.current == 1)
+        task.cancel()
+    }
+
+    @Test func runDrainsChainedSleeps() async {
+        // A task that sleeps three times in a row; run() should exhaust all of them without the
+        // test counting individual advances.
+        let clock = TestClock()
+        let steps = AtomicCounter()
+        let task = Task {
+            for _ in 0..<3 {
+                try? await clock.sleep(until: clock.now.advanced(by: .seconds(1)), tolerance: nil)
+                steps.increment()
+            }
+        }
+        await clock.waitForSleepers()
+        await clock.run()
+        await poll { steps.current >= 3 }
+        #expect(steps.current == 3)
+        #expect(clock.now.offset == .seconds(3)) // advanced exactly to the last deadline
+        task.cancel()
+    }
+
+    @Test func runReturnsImmediatelyWhenNoSleepers() async {
+        let clock = TestClock()
+        await clock.run() // must not hang
+        #expect(clock.now.offset == .zero)
     }
 
     @Test func sleepSuspendsUntilAdvanced() async {
@@ -572,10 +658,10 @@ private struct Timedout: Error, Equatable {}
         task.cancel()
     }
 
-    @Test func immediateClockSleepReturnsImmediately() async {
+    @Test func immediateClockSleepReturnsImmediatelyButAdvancesNow() async {
         let clock = ImmediateClock().eraseToAnyClock()
-        try? await clock.sleep(for: .seconds(60)) // returns at once; offset stays zero
-        #expect(clock.now.offset == .zero)
+        try? await clock.sleep(for: .seconds(60)) // returns at once, but virtual time advances
+        #expect(clock.now.offset == .seconds(60))
     }
 
     // Proves AnyClock is a drop-in `C: Clock & Sendable` for the timing operators: drive a
@@ -599,6 +685,95 @@ private struct Timedout: Error, Equatable {}
         #expect(out.values == [1])
         cont.finish()
         task.cancel()
+    }
+}
+
+// MARK: - WallClock
+
+@Suite struct WallClockTests {
+    private let epoch = Date(timeIntervalSince1970: 0)
+
+    @Test func nowReflectsInjectedProvider() {
+        let fixed = Date(timeIntervalSince1970: 1_000)
+        let clock = WallClock(now: { fixed })
+        #expect(clock.now.date == fixed)
+    }
+
+    @Test func instantArithmeticMapsToDates() {
+        let start = WallClock.Instant(epoch)
+        let later = start.advanced(by: .seconds(90))
+        #expect(later.date == epoch.addingTimeInterval(90))
+        #expect(start.duration(to: later) == .seconds(90))
+        #expect(start < later)
+    }
+
+    @Test func instantArithmeticPreservesSubsecondPrecision() {
+        let start = WallClock.Instant(epoch)
+        let later = start.advanced(by: .milliseconds(250))
+        #expect(later.date == epoch.addingTimeInterval(0.25))
+    }
+
+    @Test func sleepToPastReturnsImmediately() async {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let clock = WallClock(now: { now })
+        // Deadline already behind `now` → no real waiting.
+        try? await clock.sleep(until: clock.now.advanced(by: .seconds(-5)), tolerance: nil)
+    }
+
+    @Test func sleepWaitsRealTimeForFutureDeadline() async {
+        let clock = WallClock() // live system clock
+        let start = ContinuousClock().now
+        try? await clock.sleep(until: clock.now.advanced(by: .milliseconds(20)), tolerance: nil)
+        let elapsed = ContinuousClock().now - start
+        #expect(elapsed >= .milliseconds(10)) // actually waited (generous lower bound)
+    }
+}
+
+// MARK: - UnimplementedClock
+
+@Suite struct UnimplementedClockTests {
+    @Test func reportsWhenNowIsRead() {
+        let messages = Collector<String>()
+        let clock = UnimplementedClock("must not read time") { messages.append($0) }
+        _ = clock.now
+        #expect(messages.values.count == 1)
+        #expect(messages.values[0].contains("now"))
+        #expect(messages.values[0].contains("must not read time"))
+    }
+
+    @Test func reportsWhenMinimumResolutionIsRead() {
+        let messages = Collector<String>()
+        let clock = UnimplementedClock { messages.append($0) }
+        _ = clock.minimumResolution
+        #expect(messages.values.count == 1)
+        #expect(messages.values[0].contains("minimumResolution"))
+    }
+
+    @Test func reportsWhenSleepIsCalledThenReturns() async {
+        let messages = Collector<String>()
+        let clock = UnimplementedClock { messages.append($0) }
+        try? await clock.sleep(until: .init(), tolerance: nil) // must not hang
+        #expect(messages.values.count == 1)
+        #expect(messages.values[0].contains("sleep"))
+    }
+
+    @Test func doesNotReportWhenUntouched() {
+        let messages = Collector<String>()
+        _ = UnimplementedClock { messages.append($0) }
+        #expect(messages.values.isEmpty)
+    }
+}
+
+// MARK: - Clock.timer convenience
+
+@Suite struct ClockTimerConvenienceTests {
+    @Test func timerMethodEmitsLikeTimerSequence() async {
+        var count = 0
+        for await _ in ImmediateClock().timer(every: .seconds(1)) {
+            count += 1
+            if count == 3 { break }
+        }
+        #expect(count == 3)
     }
 }
 

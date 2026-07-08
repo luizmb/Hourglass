@@ -36,16 +36,19 @@ jobs:
             --target Hourglass \
             --output-path .docs \
             --transform-for-static-hosting \
-            --hosting-base-path Hourglass
+            --hosting-base-path Hourglass \
+            --enable-experimental-overloaded-symbol-presentation
 
-      - name: Redirect site root to /documentation/
+      - name: Redirect site root to the module's landing page
         run: |
+          # DocC static hosting emits the module landing at /documentation/hourglass/, not
+          # /documentation/. Point the root redirect straight at it so /Hourglass/ lands on content.
           cat > .docs/index.html <<'EOF'
           <!doctype html>
-          <meta http-equiv="refresh" content="0; url=./documentation/">
-          <link rel="canonical" href="./documentation/">
+          <meta http-equiv="refresh" content="0; url=./documentation/hourglass/">
+          <link rel="canonical" href="./documentation/hourglass/">
           <title>Hourglass — Documentation</title>
-          <a href="./documentation/">Redirecting to documentation…</a>
+          <a href="./documentation/hourglass/">Redirecting to documentation…</a>
           EOF
 
       - name: Configure Pages

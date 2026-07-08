@@ -4,6 +4,7 @@ public extension AsyncStream where Element: Sendable {
     /// Rate-limits the upstream to at most one element per `interval` window.
     ///
     /// - Parameters:
+    ///   - interval: The length of each rate-limiting window.
     ///   - latest: When `false` (leading edge), the first element of each window is emitted
     ///     immediately and later arrivals in that window are dropped. When `true` (trailing
     ///     edge), the most recent element of the window is emitted when the window **closes** —

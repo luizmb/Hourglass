@@ -79,26 +79,16 @@ private func drainSentValues() async {
         #expect(clock.now.offset == .seconds(10))
     }
 
-    @Test func measureIntervalSeesElapsedTime() async {
-        // With an advancing `now`, measureInterval observes real elapsed time under an ImmediateClock.
-        // The per-element gaps telescope, so their sum equals the total advance from subscription to
-        // the last element regardless of how the consumer task interleaves — a race-free invariant.
+    @Test func immediateClockDrivesTimerInstantsForward() async {
+        // With an advancing `now`, successive timer ticks under an ImmediateClock carry increasing
+        // instants rather than all reporting zero.
         let clock = ImmediateClock()
-        let (stream, cont) = AsyncStream<Int>.makeStream()
-        let durations = Collector<Duration>()
-        let task = Task {
-            for await d in stream.measureInterval(using: clock) {
-                durations.append(d)
-            }
+        var instants: [ImmediateClock.Instant] = []
+        for await instant in timerSequence(every: .seconds(1), clock: clock) {
+            instants.append(instant)
+            if instants.count == 3 { break }
         }
-        await settle() // measureInterval captures its subscription instant (0) before the clock moves
-        cont.yield(1)
-        try? await clock.sleep(until: clock.now.advanced(by: .seconds(2)), tolerance: nil)
-        cont.yield(2)
-        cont.finish()
-        await task.value
-        #expect(durations.values.count == 2)
-        #expect(durations.values.reduce(Duration.zero, +) == .seconds(2))
+        #expect(instants.map(\.offset) == [.seconds(1), .seconds(2), .seconds(3)])
     }
 
     @Test func delayWithImmediateClockPassesThrough() async {
@@ -683,6 +673,32 @@ private struct Timedout: Error, Equatable {}
         await testClock.advance(by: .seconds(1))
         await poll { out.values.count == 1 }
         #expect(out.values == [1])
+        cont.finish()
+        task.cancel()
+    }
+}
+
+// MARK: - AsyncStream+MeasureInterval
+
+@Suite struct MeasureIntervalTests {
+    @Test func reportsElapsedBetweenElements() async {
+        let clock = TestClock()
+        let (stream, cont) = AsyncStream<Int>.makeStream()
+        let durations = Collector<Duration>()
+
+        let task = Task {
+            for await d in stream.measureInterval(using: clock) {
+                durations.append(d)
+            }
+        }
+
+        cont.yield(1)
+        await poll { durations.values.count == 1 } // measured at t0 → no gap
+        await clock.advance(by: .seconds(2))
+        cont.yield(2)
+        await poll { durations.values.count == 2 } // measured 2s later → 2s gap
+        #expect(durations.values == [.zero, .seconds(2)])
+
         cont.finish()
         task.cancel()
     }

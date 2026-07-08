@@ -106,15 +106,26 @@ public final class TestClock: Clock, @unchecked Sendable {
     /// which re-registers a sleeper forever and would never let `run()` return.
     public func run() async {
         while true {
-            let nextDeadline: Instant? = _lock.withLock { _state.sleepers.map(\.deadline).min() }
-            guard let deadline = nextDeadline else {
-                // No sleeper registered right now — give a just-woken task one scheduling hop to
-                // register its next sleep, then stop if the clock is genuinely idle.
-                await Task.yield()
-                if _lock.withLock({ _state.sleepers.isEmpty }) { return }
+            if let deadline = _lock.withLock({ _state.sleepers.map(\.deadline).min() }) {
+                await advance(to: deadline)
                 continue
             }
-            await advance(to: deadline)
+            // No sleeper registered right now. A task just woken by the last `advance` may still be
+            // running toward its next sleep, so we can't conclude the clock is idle after a single
+            // hop. Yield generously; the moment a new sleeper appears, resume draining. Only when
+            // the full budget passes with none registered do we treat the clock as quiescent.
+            guard await hasSleeperWithinSettleBudget() else { return }
         }
+    }
+
+    /// Yields up to a generous budget, returning `true` as soon as a sleeper registers (so draining
+    /// resumes immediately) and `false` if the budget elapses with none — a robust "is the clock
+    /// still doing work?" check that tolerates scheduler latency across platforms.
+    private func hasSleeperWithinSettleBudget() async -> Bool {
+        for _ in 0 ..< 1000 {
+            await Task.yield()
+            if !_lock.withLock({ _state.sleepers.isEmpty }) { return true }
+        }
+        return false
     }
 }

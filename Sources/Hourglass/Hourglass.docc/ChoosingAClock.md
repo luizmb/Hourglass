@@ -30,7 +30,7 @@ Precise and monotonic, but it *pauses while the device is suspended*. Choose it 
 measure active time only — e.g. an animation or a foreground-only timer that should not "catch up"
 after the device wakes.
 
-### ``WallClock``
+### `WallClock`
 
 The standard clocks are monotonic but their instants are opaque — you cannot get a calendar `Date`
 back out. ``WallClock`` is the bridge: its ``WallClock/Instant`` wraps a real `Date`, so you can
@@ -50,7 +50,7 @@ system-clock changes (NTP steps, the user editing the date).
 
 ## Test clocks
 
-### ``TestClock`` — control time by hand
+### `TestClock` — control time by hand
 
 Virtual time that only moves when you tell it to. This is the workhorse for testing timing
 operators: advance the clock and assert exactly what was emitted.
@@ -63,13 +63,13 @@ operators: advance the clock and assert exactly what was emitted.
 
 See <doc:TestingTimingCode> for the full patterns.
 
-### ``ImmediateClock`` — skip the waiting
+### `ImmediateClock` — skip the waiting
 
 Every `sleep` returns immediately, but `now` still advances to each sleep's deadline. Use it when you
 want an operator's *pass-through* behaviour without simulating real delays, and still want elapsed
 time (`measureInterval`, timer instants) to be meaningful.
 
-### ``UnimplementedClock`` — prove time is untouched
+### `UnimplementedClock` — prove time is untouched
 
 A clock that reports a failure the instant any of its members is used. Inject it where you expect *no*
 timing to happen; if the code sleeps or reads `now`, your test fails.
@@ -82,7 +82,7 @@ let clock = UnimplementedClock("cache hit must not sleep") { message in
 }
 ```
 
-## Erasing the choice: ``AnyClock``
+## Erasing the choice: `AnyClock`
 
 `Clock` has two associated types (`Instant` and `Duration`), which makes `any Clock` nearly unusable —
 it erases `Duration`, so you can't `sleep(for: .seconds(1))`. ``AnyClock`` fixes `Duration` as its one

@@ -120,12 +120,12 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.5.app
 
       - name: Build XCFramework
-        # Vendored spm-to-xcframework (see Scripts/spm-to-xcframework/README.md) makes the product
-        # dynamic, archives every Apple slice (device + simulator) with library evolution, injects
-        # the .swiftinterface + module.modulemap into each framework, and merges them into one
-        # importable Hourglass.xcframework. iOS is built by default; the rest are opt-in.
+        # Vendored spm-to-xcframework (see .github/Scripts/spm-to-xcframework/README.md) makes the
+        # product dynamic, archives every Apple slice (device + simulator) with library evolution,
+        # injects the .swiftinterface + module.modulemap into each framework, and merges them into
+        # one importable Hourglass.xcframework. iOS is built by default; the rest are opt-in.
         run: |
-          python3 Scripts/spm-to-xcframework/spm-to-xcframework . \
+          python3 .github/Scripts/spm-to-xcframework/spm-to-xcframework . \
             --macos --tvos --watchos --visionos \
             -o build
 

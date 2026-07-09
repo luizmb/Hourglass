@@ -25,8 +25,8 @@ Re-vendor from a newer upstream commit:
 
 ```bash
 git clone https://github.com/justinwojo/spm-to-xcframework.git
-cp spm-to-xcframework/spm-to-xcframework Scripts/spm-to-xcframework/spm-to-xcframework
-cp spm-to-xcframework/LICENSE            Scripts/spm-to-xcframework/LICENSE
+cp spm-to-xcframework/spm-to-xcframework .github/Scripts/spm-to-xcframework/spm-to-xcframework
+cp spm-to-xcframework/LICENSE            .github/Scripts/spm-to-xcframework/LICENSE
 # update the pinned commit above
 ```
 

@@ -58,7 +58,7 @@ All operators extend `AsyncStream where Element: Sendable` and return `AsyncStre
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/luizmb/Hourglass.git", from: "1.0.0")
+.package(url: "https://github.com/luizmb/Hourglass.git", from: "1.0.1")
 
 // target dependency
 .product(name: "Hourglass", package: "Hourglass")

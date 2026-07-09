@@ -203,9 +203,9 @@ Code** guides, and the interactive **Debouncing with a Test Clock** tutorial.
 | tvOS | 16.0 |
 | watchOS | 9.0 |
 | visionOS | 1.0 |
-| Linux | Swift 6.0+ toolchain |
-| Windows | Swift 6.0+ toolchain |
-| Android | Swift 6.0+ toolchain |
+| Linux | Swift 6.3+ toolchain |
+| Windows | Swift 6.3+ toolchain |
+| Android | Swift 6.3+ toolchain |
 
 Minimum Apple targets are set by the `Clock` protocol (Swift 5.7 / Xcode 14).
 
